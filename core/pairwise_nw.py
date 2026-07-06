@@ -14,7 +14,7 @@ class AlignmentResult:
 def needle_wunsch(seq1: str, seq2: str, match: int, mismatch: int, gap:int) -> AlignmentResult:
     n = len(seq1)
     m = len(seq2)
-    score_matrix = [[0] * [m + 1] for _ in range(n + 1)]
+    score_matrix = [[0] * (m + 1) for _ in range(n + 1)]
 
     for i in range(n + 1):
         score_matrix[i][0] = i * gap

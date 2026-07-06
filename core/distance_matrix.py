@@ -3,6 +3,10 @@ Matriz de distancias entre todas las secuencias
 a partir del alineamiento Needle-Wunsch
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from core.pairwise_nw import needle_wunsch, AlignmentResult
 
 def percent_identify(aligned_seq1: str, aligned_seq2: str) -> float:
