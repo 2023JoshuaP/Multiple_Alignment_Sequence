@@ -1,3 +1,4 @@
 .venv/
 PlanImplementation.md
 results.txt
+tests/
