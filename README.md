@@ -2,30 +2,43 @@
 
 Este repositorio contiene la implementación desde cero de algoritmos clásicos de Alineamiento Múltiple de Secuencias (MSA), desarrollados como parte de un Trabajo Integral Final (TIF).
 
-El proyecto está diseñado de forma modular, separando las matemáticas puras de la orquestación de los algoritmos de alto nivel.
+El proyecto está diseñado de forma puramente modular, separando las matemáticas subyacentes de la orquestación de los algoritmos de alto nivel, y estructurado siguiendo estrictamente las literaturas científicas originales (Robert Edgar, 2004 para MUSCLE, etc).
 
 ## Estructura del Proyecto
 
-* **`core/`**: El "corazón" matemático del proyecto. Contiene las implementaciones base:
-  * `pairwise_nw.py`: Algoritmo de Needleman-Wunsch para alineamiento global de pares.
-  * `distance_matrix.py`: Cálculo de matrices de distancias a partir de alineamientos.
-  * `upgma.py`: Construcción de árboles filogenéticos mediante UPGMA.
-  * `neighbor_joining.py`: Construcción de árboles filogenéticos mediante Neighbor-Joining.
-  * `profile_alignment.py`: Alineamiento progresivo de perfiles.
+* **`core/`**: El "corazón" matemático del proyecto. Contiene las herramientas lógicas base:
+  * `pairwise_nw.py`: Algoritmo Needleman-Wunsch para alineamiento global.
+  * `distance_matrix.py`: Matrices de distancias tradicionales a partir de alineamientos.
+  * `kmer_distance.py`: Conteo fraccional rápido por palabras (K-mers) para aceleración.
+  * `kimura_distance.py`: Correcciones evolutivas de divergencia.
+  * `upgma.py` / `neighbor_joining.py`: Construcción matemática de árboles filogenéticos.
+  * `sp_score.py`: Función objetivo matemática (Sum-of-Pairs) para calificar iteraciones.
+  * `profile_alignment.py`: Alineamiento progresivo entre bloques/perfiles.
+  * `tree_plotter.py`: Generador de gráficos de cladogramas visuales usando Matplotlib.
+  * `fasta_parser.py`: Lector y codificador de archivos FASTA estandarizados.
+
 * **`algorithms/`**: Orquestadores de alto nivel.
-  * `clustalw.py`: Implementación del algoritmo Progresivo ClustalW.
-* **`papers/`**: Literatura científica y artículos base de donde se han extraído los algoritmos (ClustalW, MUSCLE, Recocido Simulado, etc.).
+  * `clustalw.py`: Implementación del algoritmo **Progresivo** (ClustalW) guiado por NJ.
+  * `muscle.py`: Implementación del algoritmo **Iterativo** (MUSCLE) con sus 3 Fases completas de refinamiento.
 
-## Ejecución
+* **`benchmarks/`**: Carpeta autogenerada donde se exportan los árboles visuales (`.png`) tras la ejecución.
 
-Para ejecutar el algoritmo ClustalW con secuencias de prueba:
+* **`papers/`**: Literatura científica y artículos base.
+
+## Ejecución e Interfaz
+
+El proyecto cuenta con una Interfaz Gráfica (GUI) construida en `Tkinter`, que permite cargar archivos de secuencias `.fasta`, seleccionar el algoritmo a utilizar y visualizar los resultados del análisis en tiempo real. 
+
+Para ejecutar la herramienta:
 
 ```bash
-python3 algorithms/clustalw.py
+python3 main.py
 ```
 
-## Próximos Pasos (En Desarrollo)
+*Nota: Requiere tener instalada la librería gráfica `matplotlib` (`pip install matplotlib`).*
+
+## Estado del Proyecto
 
 * [x] Alineamiento Progresivo (ClustalW)
-* [ ] Alineamiento Iterativo (MUSCLE)
+* [x] Alineamiento Iterativo (MUSCLE)
 * [ ] Alineamiento Heurístico (Simulated Annealing)
