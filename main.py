@@ -1,0 +1,186 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import threading
+import time
+import sys
+import os
+
+from core.fasta_parser import parse_fasta, get_sequence, get_ids
+from algorithms.clustalw import ClustalW
+from algorithms.muscle import MUSCLE
+from core.sp_score import sp_score
+
+class RedirectText(object):
+    def __init__(self, text_widget):
+        self.output = text_widget
+
+    def write(self, string):
+        self.output.insert(tk.END, string)
+        self.output.see(tk.END) # Auto-scroll al final
+
+    def flush(self):
+        pass
+
+class MSAApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Herramienta de Alineamiento Múltiple de Secuencias (MSA)")
+        self.geometry("900x700")
+        
+        style = ttk.Style(self)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+            
+        self.filepath = None
+        self.sequences = []
+        self.ids = []
+        
+        self.create_widgets()
+        
+    def create_widgets(self):
+        main_frame = ttk.Frame(self, padding="20 20 20 20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        title_lbl = ttk.Label(main_frame, text="Múltiple Sequence Alignment - Tesis", font=("Helvetica", 16, "bold"))
+        title_lbl.pack(pady=(0, 20))
+        
+        config_frame = ttk.LabelFrame(main_frame, text="Configuración del Análisis", padding="10 10 10 10")
+        config_frame.pack(fill=tk.X, pady=(0, 20))
+        data_frame = ttk.Frame(config_frame)
+        data_frame.pack(fill=tk.X, pady=5)
+        
+        self.lbl_file = ttk.Label(data_frame, text="Datos: Usando secuencias de prueba por defecto.", foreground="blue")
+        self.lbl_file.pack(side=tk.LEFT, padx=(0, 10))
+        
+        btn_load = ttk.Button(data_frame, text="Cargar Archivo FASTA", command=self.load_fasta)
+        btn_load.pack(side=tk.RIGHT)
+        btn_clear = ttk.Button(data_frame, text="Usar Secuencias por Defecto", command=self.use_defaults)
+        btn_clear.pack(side=tk.RIGHT, padx=5)
+
+        algo_frame = ttk.Frame(config_frame)
+        algo_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Label(algo_frame, text="Algoritmo a ejecutar:").pack(side=tk.LEFT, padx=(0, 15))
+        
+        self.algo_var = tk.StringVar(value="3")
+        ttk.Radiobutton(algo_frame, text="ClustalW (Progresivo)", variable=self.algo_var, value="1").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(algo_frame, text="MUSCLE (Iterativo)", variable=self.algo_var, value="2").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(algo_frame, text="Comparar Ambos", variable=self.algo_var, value="3").pack(side=tk.LEFT, padx=5)
+
+        self.btn_run = ttk.Button(config_frame, text="Ejecutar Alineamiento", command=self.start_alignment_thread)
+        self.btn_run.pack(fill=tk.X, pady=10)
+        res_frame = ttk.LabelFrame(main_frame, text="Consola de Resultados", padding="10 10 10 10")
+        res_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.text_area = tk.Text(res_frame, wrap=tk.NONE, font=("Courier", 10), bg="#1e1e1e", fg="#d4d4d4")
+        vsb = ttk.Scrollbar(res_frame, orient="vertical", command=self.text_area.yview)
+        hsb = ttk.Scrollbar(res_frame, orient="horizontal", command=self.text_area.xview)
+        self.text_area.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        self.text_area.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        res_frame.grid_rowconfigure(0, weight=1)
+        res_frame.grid_columnconfigure(0, weight=1)
+        
+        redir = RedirectText(self.text_area)
+        sys.stdout = redir
+        
+        self.use_defaults()
+
+    def load_fasta(self):
+        filepath = filedialog.askopenfilename(
+            title="Seleccionar Archivo FASTA",
+            filetypes=(("FASTA files", "*.fasta *.fa"), ("Todos los archivos", "*.*"))
+        )
+        if filepath:
+            try:
+                records = parse_fasta(filepath)
+                self.sequences = get_sequence(records)
+                self.ids = get_ids(records)
+                self.filepath = filepath
+                self.lbl_file.config(text=f"Datos: {os.path.basename(filepath)} ({len(self.sequences)} secuencias)")
+                print(f"Archivo cargado exitosamente: {filepath}")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar el archivo FASTA:\n{e}")
+
+    def use_defaults(self):
+        self.filepath = None
+        self.sequences = [
+            "MKTAYIAKQRQISFV",
+            "MKTAYIAKQRQISFVKS",
+            "MKTAIAKQRQISFV",
+            "GGGGCCCCTTTTAAAA",
+        ]
+        self.ids = ["Seq1", "Seq2", "Seq3", "Seq4"]
+        self.lbl_file.config(text="Datos: Usando secuencias de prueba por defecto.")
+        print("Datos reseteados a las secuencias de ejemplo.")
+
+    def format_alignment_str(self, profile: list[str], labels: list[str]) -> str:
+        out = ""
+        width = max(len(lbl) for lbl in labels) + 2
+        for lbl, seq in zip(labels, profile):
+            out += f"{lbl:<{width}}{seq}\n"
+        return out
+
+    def start_alignment_thread(self):
+        self.btn_run.config(state=tk.DISABLED)
+        self.text_area.delete(1.0, tk.END)
+        print(f"Iniciando análisis para {len(self.sequences)} secuencias...\n")
+        
+        t = threading.Thread(target=self.run_alignment)
+        t.daemon = True
+        t.start()
+
+    def run_alignment(self):
+        opcion = self.algo_var.get()
+        correr_clustal = opcion in ["1", "3"]
+        correr_muscle = opcion in ["2", "3"]
+        
+        resultados = []
+
+        try:
+            if correr_clustal:
+                print("="*50)
+                print(" EJECUTANDO CLUSTALW (Progresivo - Árbol NJ) ")
+                print("="*50)
+                clustal = ClustalW()
+                start = time.time()
+                msa_c, ids_c, _, _ = clustal.align(self.sequences, self.ids)
+                t_c = time.time() - start
+                score_c = sp_score(msa_c)
+                resultados.append(("ClustalW", t_c, score_c, msa_c, ids_c))
+                
+            if correr_muscle:
+                print("\n" + "="*50)
+                print(" EJECUTANDO MUSCLE (Iterativo - Refinamiento) ")
+                print("="*50)
+                muscle = MUSCLE(max_iters=3)
+                start = time.time()
+                msa_m, ids_m, score_m = muscle.align(self.sequences, self.ids)
+                t_m = time.time() - start
+                resultados.append(("MUSCLE", t_m, score_m, msa_m, ids_m))
+
+            print("\n\n" + "#"*50)
+            print(" COMPARATIVA FINAL DE RESULTADOS ")
+            print("#"*50)
+            
+            for nombre, tiempo, score, msa, msa_ids in resultados:
+                print(f"\n[ ALGORITMO: {nombre} ]")
+                print(f"  Tiempo de ejecución : {tiempo:.4f} segundos")
+                print(f"  SP-Score Objetivo   : {score:.1f} (mayor es mejor)")
+                print("-" * 50)
+                print(self.format_alignment_str(msa, msa_ids))
+                print("-" * 50)
+                
+            print("\n¡Análisis completado exitosamente!")
+            
+        except Exception as e:
+            print(f"\nERROR DURANTE LA EJECUCIÓN:\n{e}")
+        finally:
+            self.after(0, lambda: self.btn_run.config(state=tk.NORMAL))
+
+if __name__ == "__main__":
+    app = MSAApp()
+    app.mainloop()
