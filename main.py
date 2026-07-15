@@ -72,7 +72,7 @@ class MSAApp(tk.Tk):
         res_frame = ttk.LabelFrame(main_frame, text="Consola de Resultados", padding="10 10 10 10")
         res_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.text_area = tk.Text(res_frame, wrap=tk.NONE, font=("Courier", 10), bg="#1e1e1e", fg="#d4d4d4")
+        self.text_area = tk.Text(res_frame, wrap=tk.NONE, font=("Courier", 10), bg="white", fg="black")
         vsb = ttk.Scrollbar(res_frame, orient="vertical", command=self.text_area.yview)
         hsb = ttk.Scrollbar(res_frame, orient="horizontal", command=self.text_area.xview)
         self.text_area.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -147,10 +147,20 @@ class MSAApp(tk.Tk):
                 print("="*50)
                 clustal = ClustalW()
                 start = time.time()
-                msa_c, ids_c, _, _ = clustal.align(self.sequences, self.ids)
+                msa_c, ids_c, tree_c, _ = clustal.align(self.sequences, self.ids)
                 t_c = time.time() - start
                 score_c = sp_score(msa_c)
                 resultados.append(("ClustalW", t_c, score_c, msa_c, ids_c))
+                
+                os.makedirs("benchmarks", exist_ok=True)
+                filepath_c = os.path.join("benchmarks", "arbol_clustalw.png")
+                try:
+                    from core.tree_plotter import plot_phylogenetic_tree
+                    plot_phylogenetic_tree(tree_c, filepath_c, title="Árbol Guía (Neighbor-Joining)", is_nj=True)
+                    print(f"-> Gráfica NJ guardada en: {filepath_c}")
+                    os.system(f"xdg-open '{filepath_c}' &")
+                except Exception as ex:
+                    print(f"-> No se pudo graficar el árbol: {ex}")
                 
             if correr_muscle:
                 print("\n" + "="*50)
@@ -158,9 +168,19 @@ class MSAApp(tk.Tk):
                 print("="*50)
                 muscle = MUSCLE(max_iters=3)
                 start = time.time()
-                msa_m, ids_m, score_m = muscle.align(self.sequences, self.ids)
+                msa_m, ids_m, score_m, tree_m = muscle.align(self.sequences, self.ids)
                 t_m = time.time() - start
                 resultados.append(("MUSCLE", t_m, score_m, msa_m, ids_m))
+
+                os.makedirs("benchmarks", exist_ok=True)
+                filepath_m = os.path.join("benchmarks", "arbol_muscle.png")
+                try:
+                    from core.tree_plotter import plot_phylogenetic_tree
+                    plot_phylogenetic_tree(tree_m, filepath_m, title="Árbol Guía (UPGMA)", is_nj=False)
+                    print(f"-> Gráfica UPGMA guardada en: {filepath_m}")
+                    os.system(f"xdg-open '{filepath_m}' &")
+                except Exception as ex:
+                    print(f"-> No se pudo graficar el árbol: {ex}")
 
             print("\n\n" + "#"*50)
             print(" COMPARATIVA FINAL DE RESULTADOS ")
