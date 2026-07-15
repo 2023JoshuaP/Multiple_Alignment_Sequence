@@ -112,7 +112,7 @@ class MUSCLE:
                 break
 
         aligned_ids = [ids[i] for i in current_order]
-        return current_msa, aligned_ids, current_score
+        return current_msa, aligned_ids, current_score, tree2
 
 if __name__ == "__main__":
     seqs = [
