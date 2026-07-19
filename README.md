@@ -16,10 +16,12 @@ El proyecto está diseñado de forma puramente modular, separando las matemátic
   * `profile_alignment.py`: Alineamiento progresivo entre bloques/perfiles.
   * `tree_plotter.py`: Generador de gráficos de cladogramas visuales usando Matplotlib.
   * `fasta_parser.py`: Lector y codificador de archivos FASTA estandarizados.
+  * `sa_moves.py`: Operadores de mutación estocástica (gap shifting, etc.) para exploración heurística.
 
 * **`algorithms/`**: Orquestadores de alto nivel.
   * `clustalw.py`: Implementación del algoritmo **Progresivo** (ClustalW) guiado por NJ.
   * `muscle.py`: Implementación del algoritmo **Iterativo** (MUSCLE) con sus 3 Fases completas de refinamiento.
+  * `simulated_annealing.py`: Implementación del algoritmo **Heurístico** basado en recocido termodinámico estocástico para evitar trampas locales.
 
 * **`benchmarks/`**: Carpeta autogenerada donde se exportan los árboles visuales (`.png`) tras la ejecución.
 
@@ -41,4 +43,4 @@ python3 main.py
 
 * [x] Alineamiento Progresivo (ClustalW)
 * [x] Alineamiento Iterativo (MUSCLE)
-* [ ] Alineamiento Heurístico (Simulated Annealing)
+* [x] Alineamiento Heurístico (Simulated Annealing)
