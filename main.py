@@ -8,6 +8,7 @@ import os
 from core.fasta_parser import parse_fasta, get_sequence, get_ids
 from algorithms.clustalw import ClustalW
 from algorithms.muscle import MUSCLE
+from algorithms.simulated_annealing import SimulatedAnnealing
 from core.sp_score import sp_score
 
 class RedirectText(object):
@@ -62,10 +63,11 @@ class MSAApp(tk.Tk):
         
         ttk.Label(algo_frame, text="Algoritmo a ejecutar:").pack(side=tk.LEFT, padx=(0, 15))
         
-        self.algo_var = tk.StringVar(value="3")
+        self.algo_var = tk.StringVar(value="4")
         ttk.Radiobutton(algo_frame, text="ClustalW (Progresivo)", variable=self.algo_var, value="1").pack(side=tk.LEFT, padx=5)
         ttk.Radiobutton(algo_frame, text="MUSCLE (Iterativo)", variable=self.algo_var, value="2").pack(side=tk.LEFT, padx=5)
-        ttk.Radiobutton(algo_frame, text="Comparar Ambos", variable=self.algo_var, value="3").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(algo_frame, text="Simulated Annealing (Heurístico)", variable=self.algo_var, value="3").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(algo_frame, text="Comparar Todos", variable=self.algo_var, value="4").pack(side=tk.LEFT, padx=5)
 
         self.btn_run = ttk.Button(config_frame, text="Ejecutar Alineamiento", command=self.start_alignment_thread)
         self.btn_run.pack(fill=tk.X, pady=10)
@@ -135,8 +137,9 @@ class MSAApp(tk.Tk):
 
     def run_alignment(self):
         opcion = self.algo_var.get()
-        correr_clustal = opcion in ["1", "3"]
-        correr_muscle = opcion in ["2", "3"]
+        correr_clustal = opcion in ["1", "4"]
+        correr_muscle = opcion in ["2", "4"]
+        correr_sa = opcion in ["3", "4"]
         
         resultados = []
 
@@ -181,6 +184,27 @@ class MSAApp(tk.Tk):
                     os.system(f"xdg-open '{filepath_m}' &")
                 except Exception as ex:
                     print(f"-> No se pudo graficar el árbol: {ex}")
+
+            if correr_sa:
+                print("\n" + "="*50)
+                print(" EJECUTANDO SIMULATED ANNEALING (Heurístico) ")
+                print("="*50)
+                sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, max_iters=500)
+                start = time.time()
+                msa_s, ids_s, score_s, tree_s = sa.align(self.sequences, self.ids)
+                t_s = time.time() - start
+                resultados.append(("Simulated Annealing", t_s, score_s, msa_s, ids_s))
+                
+                if tree_s:
+                    os.makedirs("benchmarks", exist_ok=True)
+                    filepath_s = os.path.join("benchmarks", "arbol_sa.png")
+                    try:
+                        from core.tree_plotter import plot_phylogenetic_tree
+                        plot_phylogenetic_tree(tree_s, filepath_s, title="Árbol Guía (Simulated Annealing)", is_nj=False)
+                        print(f"-> Gráfica SA guardada en: {filepath_s}")
+                        os.system(f"xdg-open '{filepath_s}' &")
+                    except Exception as ex:
+                        print(f"-> No se pudo graficar el árbol: {ex}")
 
             print("\n\n" + "#"*50)
             print(" COMPARATIVA FINAL DE RESULTADOS ")
