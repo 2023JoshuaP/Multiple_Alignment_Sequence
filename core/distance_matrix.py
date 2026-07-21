@@ -27,15 +27,34 @@ def pairwise_distance(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, 
     
     return 1.0 - identity
 
+def _pairwise_distance_wrapper(args):
+    i, j, seq1, seq2, match, mismatch, gap = args
+    return i, j, pairwise_distance(seq1, seq2, match, mismatch, gap)
+
 def build_distance_matrix(sequences: list[str], match: int = 1, mismatch: int = -1, gap: int = -2) -> list[list[float]]:
     n = len(sequences)
     matrix = [[0.0] * n for _ in range(n)]
-
+    
+    tasks = []
     for i in range(n):
         for j in range(i + 1, n):
-            d = pairwise_distance(sequences[i], sequences[j], match, mismatch, gap)
+            tasks.append((i, j, sequences[i], sequences[j], match, mismatch, gap))
+            
+    # Para pocos cruces, no vale la pena el overhead de multiprocesamiento
+    if len(tasks) < 5:
+        for args in tasks:
+            i, j, d = _pairwise_distance_wrapper(args)
             matrix[i][j] = d
             matrix[j][i] = d
+    else:
+        import concurrent.futures
+        import multiprocessing
+        cores = max(1, multiprocessing.cpu_count() - 1)
+        print(f"      -> Computando matriz de distancias usando {cores} núcleos en paralelo...")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=cores) as executor:
+            for i, j, d in executor.map(_pairwise_distance_wrapper, tasks):
+                matrix[i][j] = d
+                matrix[j][i] = d
 
     return matrix
 

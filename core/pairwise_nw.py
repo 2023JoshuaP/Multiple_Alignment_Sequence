@@ -11,40 +11,90 @@ class AlignmentResult:
     aligned_seq2: str
     score: int
 
-def needle_wunsch(seq1: str, seq2: str, match: int, mismatch: int, gap:int) -> AlignmentResult:
+def needle_wunsch(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, gap: int = -2, band_width: int = 400) -> AlignmentResult:
     n = len(seq1)
     m = len(seq2)
-    score_matrix = [[0] * (m + 1) for _ in range(n + 1)]
+    
+    # Auto-disable band if sequences are small enough
+    if n < 500 and m < 500:
+        band_width = max(n, m) + 1
 
-    for i in range(n + 1):
-        score_matrix[i][0] = i * gap
+    # Optimizamos memoria: guardamos solo 2 filas de scores
+    prev_score = [float('-inf')] * (m + 1)
+    curr_score = [float('-inf')] * (m + 1)
+    
+    # Backtrace de n x m usando bytearray (1 byte por celda, memory-safe)
+    # 0: None, 1: Diagonal, 2: Up, 3: Left
+    backtrace = [bytearray(m + 1) for _ in range(n + 1)]
+
+    # Init primera fila
     for j in range(m + 1):
-        score_matrix[0][j] = j * gap
+        if j > band_width: break
+        prev_score[j] = j * gap
+        backtrace[0][j] = 3 # Left
 
     for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            score_diagonal = score_matrix[i - 1][j - 1] + (match if seq1[i - 1] == seq2[j - 1] else mismatch)
-            score_up = score_matrix[i - 1][j] + gap
-            score_left = score_matrix[i][j - 1] + gap
-            score_matrix[i][j] = max(score_diagonal, score_up, score_left)
+        # Limpiar curr_score para esta fila
+        for j in range(m + 1): curr_score[j] = float('-inf')
+        
+        # Init primera columna de esta fila
+        if i <= band_width:
+            curr_score[0] = i * gap
+            backtrace[i][0] = 2 # Up
+            
+        # Calcular centro de la banda
+        center_j = int(i * (m / n)) if n > 0 else i
+        start_j = max(1, center_j - band_width)
+        end_j = min(m, center_j + band_width)
 
+        for j in range(start_j, end_j + 1):
+            s_diag = prev_score[j - 1] + (match if seq1[i - 1] == seq2[j - 1] else mismatch)
+            s_up = prev_score[j] + gap
+            s_left = curr_score[j - 1] + gap
+            
+            best_s = max(s_diag, s_up, s_left)
+            curr_score[j] = best_s
+            
+            if best_s == s_diag:
+                backtrace[i][j] = 1
+            elif best_s == s_up:
+                backtrace[i][j] = 2
+            else:
+                backtrace[i][j] = 3
+                
+        # Rotar filas
+        prev_score, curr_score = curr_score, prev_score
+
+    final_score = prev_score[m]
+    
     # Backtracking process
     aligned_seq1_chars = []
     aligned_seq2_chars = []
     i, j = n, m
 
     while i > 0 or j > 0:
-        if i > 0 and j > 0:
-            score_diagonal = score_matrix[i - 1][j - 1] + (match if seq1[i - 1] == seq2[j - 1] else mismatch)
-            score_up = score_matrix[i - 1][j] + gap
-            score_left = score_matrix[i][j - 1] + gap
-
-            if score_matrix[i][j] == score_diagonal:
+        direction = backtrace[i][j]
+        if direction == 1 and i > 0 and j > 0:
+            aligned_seq1_chars.append(seq1[i - 1])
+            aligned_seq2_chars.append(seq2[j - 1])
+            i -= 1
+            j -= 1
+        elif direction == 2 and i > 0:
+            aligned_seq1_chars.append(seq1[i - 1])
+            aligned_seq2_chars.append('-')
+            i -= 1
+        elif direction == 3 and j > 0:
+            aligned_seq1_chars.append('-')
+            aligned_seq2_chars.append(seq2[j - 1])
+            j -= 1
+        else:
+            # Fallback en caso de que la banda no haya cubierto la esquina final perfectamente
+            if i > 0 and j > 0:
                 aligned_seq1_chars.append(seq1[i - 1])
                 aligned_seq2_chars.append(seq2[j - 1])
                 i -= 1
                 j -= 1
-            elif score_matrix[i][j] == score_up:
+            elif i > 0:
                 aligned_seq1_chars.append(seq1[i - 1])
                 aligned_seq2_chars.append('-')
                 i -= 1
@@ -52,16 +102,8 @@ def needle_wunsch(seq1: str, seq2: str, match: int, mismatch: int, gap:int) -> A
                 aligned_seq1_chars.append('-')
                 aligned_seq2_chars.append(seq2[j - 1])
                 j -= 1
-        elif i > 0:
-            aligned_seq1_chars.append(seq1[i - 1])
-            aligned_seq2_chars.append('-')
-            i -= 1
-        else:
-            aligned_seq1_chars.append('-')
-            aligned_seq2_chars.append(seq2[j - 1])
-            j -= 1
 
     aligned_seq1 = "".join(reversed(aligned_seq1_chars))
     aligned_seq2 = "".join(reversed(aligned_seq2_chars))
 
-    return AlignmentResult(aligned_seq1, aligned_seq2, score_matrix[n][m])
+    return AlignmentResult(aligned_seq1, aligned_seq2, int(final_score))

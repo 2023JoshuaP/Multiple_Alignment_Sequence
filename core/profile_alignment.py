@@ -35,26 +35,52 @@ def _column_score(col1: list[str], col2: list[str], match: int, mismatch: int, g
 
     return total / count if count > 0 else 0.0
 
-def align_profiles(profile1: list[str], profile2: list[str], match: int = 1, mismatch: int = -1, gap: int = -2) -> list[str]:
+def align_profiles(profile1: list[str], profile2: list[str], match: int = 1, mismatch: int = -1, gap: int = -2, band_width: int = 400) -> list[str]:
     n = len(profile1[0])
     m = len(profile2[0])
     
-    score_matrix = [[0.0] * (m + 1) for _ in range(n + 1)]
-    for i in range(n + 1):
-        score_matrix[i][0] = i * gap
-    for j in range(m + 1):
-        score_matrix[0][j] = j * gap
-
+    if n < 500 and m < 500:
+        band_width = max(n, m) + 1
+        
     cols1 = [_get_column(profile1, i) for i in range(n)]
     cols2 = [_get_column(profile2, j) for j in range(m)]
 
+    prev_score = [float('-inf')] * (m + 1)
+    curr_score = [float('-inf')] * (m + 1)
+    backtrace = [bytearray(m + 1) for _ in range(n + 1)]
+
+    for j in range(m + 1):
+        if j > band_width: break
+        prev_score[j] = j * gap
+        backtrace[0][j] = 3
+
     for i in range(1, n + 1):
-        for j in range(1, m + 1):
+        for j in range(m + 1): curr_score[j] = float('-inf')
+        if i <= band_width:
+            curr_score[0] = i * gap
+            backtrace[i][0] = 2
+            
+        center_j = int(i * (m / n)) if n > 0 else i
+        start_j = max(1, center_j - band_width)
+        end_j = min(m, center_j + band_width)
+
+        for j in range(start_j, end_j + 1):
             col_score = _column_score(cols1[i - 1], cols2[j - 1], match, mismatch, gap)
-            score_diagonal = score_matrix[i - 1][j - 1] + col_score
-            score_up = score_matrix[i - 1][j] + gap
-            score_left = score_matrix[i][j - 1] + gap
-            score_matrix[i][j] = max(score_diagonal, score_up, score_left)
+            s_diag = prev_score[j - 1] + col_score
+            s_up = prev_score[j] + gap
+            s_left = curr_score[j - 1] + gap
+            
+            best_s = max(s_diag, s_up, s_left)
+            curr_score[j] = best_s
+            
+            if best_s == s_diag:
+                backtrace[i][j] = 1
+            elif best_s == s_up:
+                backtrace[i][j] = 2
+            else:
+                backtrace[i][j] = 3
+                
+        prev_score, curr_score = curr_score, prev_score
 
     aligned_cols_1 = []
     aligned_cols_2 = []
@@ -64,18 +90,27 @@ def align_profiles(profile1: list[str], profile2: list[str], match: int = 1, mis
     gap_col_for_profile2 = ['-'] * len(profile2)
 
     while i > 0 or j > 0:
-        if i > 0 and j > 0:
-            col_score = _column_score(cols1[i - 1], cols2[j - 1], match, mismatch, gap)
-            score_diagonal = score_matrix[i - 1][j - 1] + col_score
-            score_up = score_matrix[i - 1][j] + gap
-            score_left = score_matrix[i][j - 1] + gap
-
-            if score_matrix[i][j] == score_diagonal:
+        direction = backtrace[i][j]
+        if direction == 1 and i > 0 and j > 0:
+            aligned_cols_1.append(cols1[i - 1])
+            aligned_cols_2.append(cols2[j - 1])
+            i -= 1
+            j -= 1
+        elif direction == 2 and i > 0:
+            aligned_cols_1.append(cols1[i - 1])
+            aligned_cols_2.append(gap_col_for_profile2)
+            i -= 1
+        elif direction == 3 and j > 0:
+            aligned_cols_1.append(gap_col_for_profile1)
+            aligned_cols_2.append(cols2[j - 1])
+            j -= 1
+        else:
+            if i > 0 and j > 0:
                 aligned_cols_1.append(cols1[i - 1])
                 aligned_cols_2.append(cols2[j - 1])
                 i -= 1
                 j -= 1
-            elif score_matrix[i][j] == score_up:
+            elif i > 0:
                 aligned_cols_1.append(cols1[i - 1])
                 aligned_cols_2.append(gap_col_for_profile2)
                 i -= 1
@@ -83,14 +118,6 @@ def align_profiles(profile1: list[str], profile2: list[str], match: int = 1, mis
                 aligned_cols_1.append(gap_col_for_profile1)
                 aligned_cols_2.append(cols2[j - 1])
                 j -= 1
-        elif i > 0:
-            aligned_cols_1.append(cols1[i - 1])
-            aligned_cols_2.append(gap_col_for_profile2)
-            i -= 1
-        else:
-            aligned_cols_1.append(gap_col_for_profile1)
-            aligned_cols_2.append(cols2[j - 1])
-            j -= 1
 
     aligned_cols_1.reverse()
     aligned_cols_2.reverse()
