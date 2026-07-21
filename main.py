@@ -4,6 +4,7 @@ import threading
 import time
 import sys
 import os
+import tracemalloc
 
 from core.fasta_parser import parse_fasta, get_sequence, get_ids
 from algorithms.clustalw import ClustalW
@@ -42,7 +43,7 @@ class MSAApp(tk.Tk):
         main_frame = ttk.Frame(self, padding="20 20 20 20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        title_lbl = ttk.Label(main_frame, text="Múltiple Sequence Alignment - Tesis", font=("Helvetica", 16, "bold"))
+        title_lbl = ttk.Label(main_frame, text="Múltiple Sequence Alignment", font=("Helvetica", 16, "bold"))
         title_lbl.pack(pady=(0, 20))
         
         config_frame = ttk.LabelFrame(main_frame, text="Configuración del Análisis", padding="10 10 10 10")
@@ -149,11 +150,15 @@ class MSAApp(tk.Tk):
                 print(" EJECUTANDO CLUSTALW (Progresivo - Árbol NJ) ")
                 print("="*50)
                 clustal = ClustalW()
+                tracemalloc.start()
                 start = time.time()
                 msa_c, ids_c, tree_c, _ = clustal.align(self.sequences, self.ids)
                 t_c = time.time() - start
+                _, peak = tracemalloc.get_traced_memory()
+                tracemalloc.stop()
+                peak_mb = peak / 1048576.0
                 score_c = sp_score(msa_c)
-                resultados.append(("ClustalW", t_c, score_c, msa_c, ids_c))
+                resultados.append(("ClustalW", t_c, peak_mb, score_c, msa_c, ids_c))
                 
                 os.makedirs("benchmarks", exist_ok=True)
                 filepath_c = os.path.join("benchmarks", "arbol_clustalw.png")
@@ -170,10 +175,14 @@ class MSAApp(tk.Tk):
                 print(" EJECUTANDO MUSCLE (Iterativo - Refinamiento) ")
                 print("="*50)
                 muscle = MUSCLE(max_iters=3)
+                tracemalloc.start()
                 start = time.time()
                 msa_m, ids_m, score_m, tree_m = muscle.align(self.sequences, self.ids)
                 t_m = time.time() - start
-                resultados.append(("MUSCLE", t_m, score_m, msa_m, ids_m))
+                _, peak = tracemalloc.get_traced_memory()
+                tracemalloc.stop()
+                peak_mb = peak / 1048576.0
+                resultados.append(("MUSCLE", t_m, peak_mb, score_m, msa_m, ids_m))
 
                 os.makedirs("benchmarks", exist_ok=True)
                 filepath_m = os.path.join("benchmarks", "arbol_muscle.png")
@@ -190,17 +199,21 @@ class MSAApp(tk.Tk):
                 print(" EJECUTANDO SIMULATED ANNEALING (Heurístico) ")
                 print("="*50)
                 sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, max_iters=500)
+                tracemalloc.start()
                 start = time.time()
                 msa_s, ids_s, score_s, tree_s = sa.align(self.sequences, self.ids)
                 t_s = time.time() - start
-                resultados.append(("Simulated Annealing", t_s, score_s, msa_s, ids_s))
+                _, peak = tracemalloc.get_traced_memory()
+                tracemalloc.stop()
+                peak_mb = peak / 1048576.0
+                resultados.append(("Simulated Annealing", t_s, peak_mb, score_s, msa_s, ids_s))
                 
                 if tree_s:
                     os.makedirs("benchmarks", exist_ok=True)
                     filepath_s = os.path.join("benchmarks", "arbol_sa.png")
                     try:
                         from core.tree_plotter import plot_phylogenetic_tree
-                        plot_phylogenetic_tree(tree_s, filepath_s, title="Árbol Guía (Simulated Annealing)", is_nj=False)
+                        plot_phylogenetic_tree(tree_s, filepath_s, title="Árbol Guía (Simulated Annealing)", is_nj=True)
                         print(f"-> Gráfica SA guardada en: {filepath_s}")
                         os.system(f"xdg-open '{filepath_s}' &")
                     except Exception as ex:
@@ -210,15 +223,27 @@ class MSAApp(tk.Tk):
             print(" COMPARATIVA FINAL DE RESULTADOS ")
             print("#"*50)
             
-            for nombre, tiempo, score, msa, msa_ids in resultados:
-                print(f"\n[ ALGORITMO: {nombre} ]")
-                print(f"  Tiempo de ejecución : {tiempo:.4f} segundos")
-                print(f"  SP-Score Objetivo   : {score:.1f} (mayor es mejor)")
-                print("-" * 50)
-                print(self.format_alignment_str(msa, msa_ids))
-                print("-" * 50)
-                
-            print("\n¡Análisis completado exitosamente!")
+            with open("results.txt", "w", encoding="utf-8") as f:
+                for nombre, tiempo, ram, score, msa, msa_ids in resultados:
+                    # Imprimir en consola
+                    print(f"\n[ ALGORITMO: {nombre} ]")
+                    print(f"  Tiempo de ejecución : {tiempo:.4f} segundos")
+                    print(f"  Uso Pico de Memoria : {ram:.2f} MB")
+                    print(f"  SP-Score Objetivo   : {score:.1f} (mayor es mejor)")
+                    print("-" * 50)
+                    print(self.format_alignment_str(msa, msa_ids))
+                    print("-" * 50)
+                    
+                    # Guardar en archivo log
+                    f.write(f"\n[ ALGORITMO: {nombre} ]\n")
+                    f.write(f"  Tiempo de ejecución : {tiempo:.4f} segundos\n")
+                    f.write(f"  Uso Pico de Memoria : {ram:.2f} MB\n")
+                    f.write(f"  SP-Score Objetivo   : {score:.1f} (mayor es mejor)\n")
+                    f.write("-" * 50 + "\n")
+                    f.write(self.format_alignment_str(msa, msa_ids) + "\n")
+                    f.write("-" * 50 + "\n")
+                    
+            print("\n¡Análisis completado exitosamente! (Resultados guardados en results.txt)")
             
         except Exception as e:
             print(f"\nERROR DURANTE LA EJECUCIÓN:\n{e}")

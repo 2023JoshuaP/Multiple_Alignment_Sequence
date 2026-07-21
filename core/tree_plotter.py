@@ -63,16 +63,21 @@ def plot_phylogenetic_tree(node, filepath, title="Árbol Filogenético", is_nj=F
     def draw_lines(n):
         if not n.is_leaf():
             # Línea vertical
-            plt.plot([x_coords[id(n)], x_coords[id(n)]], [y_coords[id(n.left)], y_coords[id(n.right)]], color='black', lw=2)
+            plt.plot([x_coords[id(n)], x_coords[id(n)]], [y_coords[id(n.left)], y_coords[id(n.right)]], color='#2c3e50', lw=2.5, zorder=2)
             
             # Líneas horizontales a los hijos
-            plt.plot([x_coords[id(n)], x_coords[id(n.left)]], [y_coords[id(n.left)], y_coords[id(n.left)]], color='black', lw=2)
-            plt.plot([x_coords[id(n)], x_coords[id(n.right)]], [y_coords[id(n.right)], y_coords[id(n.right)]], color='black', lw=2)
+            plt.plot([x_coords[id(n)], x_coords[id(n.left)]], [y_coords[id(n.left)], y_coords[id(n.left)]], color='#2c3e50', lw=2.5, zorder=2)
+            plt.plot([x_coords[id(n)], x_coords[id(n.right)]], [y_coords[id(n.right)], y_coords[id(n.right)]], color='#2c3e50', lw=2.5, zorder=2)
             
             draw_lines(n.left)
             draw_lines(n.right)
             
     draw_lines(node)
+    
+    # Dibujar nodos como puntos
+    all_x = list(x_coords.values())
+    all_y = [y_coords[k] for k in x_coords.keys()]
+    plt.scatter(all_x, all_y, color='#e74c3c', s=60, zorder=3, edgecolors='white', linewidths=1.5)
     
     # Etiquetas de hojas
     xs = list(x_coords.values())
@@ -81,19 +86,23 @@ def plot_phylogenetic_tree(node, filepath, title="Árbol Filogenético", is_nj=F
     margin = (max_x - min_x) * 0.02 if max_x != min_x else 0.1
     
     for leaf in leaves:
-        plt.text(x_coords[id(leaf)] + margin, y_coords[id(leaf)], leaf.label, va='center', ha='left', fontsize=12)
+        plt.text(x_coords[id(leaf)] + margin, y_coords[id(leaf)], leaf.label, va='center', ha='left', fontsize=12, fontweight='bold', color='#2c3e50')
         
-    plt.title(title, fontsize=14)
-    plt.xlabel("Distancia Evolutiva")
+    plt.title(title, fontsize=16, fontweight='bold', pad=20, color='#34495e')
+    plt.xlabel("Distancia Evolutiva", fontsize=12, color='#7f8c8d')
     plt.yticks([])
+    
+    # Grid y estilos de ejes
+    plt.grid(axis='x', linestyle='--', alpha=0.5, color='#bdc3c7', zorder=0)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.gca().spines['left'].set_visible(False)
+    plt.gca().spines['bottom'].set_color('#7f8c8d')
     
     plt.xlim(min_x - margin*2, max_x + margin*15)
     
     plt.tight_layout()
-    plt.savefig(filepath, format='png', dpi=150)
+    plt.savefig(filepath, format='png', dpi=200, bbox_inches='tight')
     plt.close()
     
     return filepath
