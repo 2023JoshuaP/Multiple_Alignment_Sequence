@@ -40,7 +40,6 @@ def build_distance_matrix(sequences: list[str], match: int = 1, mismatch: int = 
         for j in range(i + 1, n):
             tasks.append((i, j, sequences[i], sequences[j], match, mismatch, gap))
             
-    # Para pocos cruces, no vale la pena el overhead de multiprocesamiento
     if len(tasks) < 5:
         for args in tasks:
             i, j, d = _pairwise_distance_wrapper(args)

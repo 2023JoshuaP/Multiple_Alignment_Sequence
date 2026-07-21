@@ -15,11 +15,9 @@ def needle_wunsch(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, gap:
     n = len(seq1)
     m = len(seq2)
     
-    # Auto-disable band if sequences are small enough
     if n < 500 and m < 500:
         band_width = max(n, m) + 1
 
-    # Optimizamos memoria: guardamos solo 2 filas de scores
     prev_score = [float('-inf')] * (m + 1)
     curr_score = [float('-inf')] * (m + 1)
     
@@ -27,22 +25,18 @@ def needle_wunsch(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, gap:
     # 0: None, 1: Diagonal, 2: Up, 3: Left
     backtrace = [bytearray(m + 1) for _ in range(n + 1)]
 
-    # Init primera fila
     for j in range(m + 1):
         if j > band_width: break
         prev_score[j] = j * gap
         backtrace[0][j] = 3 # Left
 
     for i in range(1, n + 1):
-        # Limpiar curr_score para esta fila
         for j in range(m + 1): curr_score[j] = float('-inf')
         
-        # Init primera columna de esta fila
         if i <= band_width:
             curr_score[0] = i * gap
             backtrace[i][0] = 2 # Up
             
-        # Calcular centro de la banda
         center_j = int(i * (m / n)) if n > 0 else i
         start_j = max(1, center_j - band_width)
         end_j = min(m, center_j + band_width)
@@ -62,12 +56,10 @@ def needle_wunsch(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, gap:
             else:
                 backtrace[i][j] = 3
                 
-        # Rotar filas
         prev_score, curr_score = curr_score, prev_score
 
     final_score = prev_score[m]
     
-    # Backtracking process
     aligned_seq1_chars = []
     aligned_seq2_chars = []
     i, j = n, m
@@ -88,7 +80,6 @@ def needle_wunsch(seq1: str, seq2: str, match: int = 1, mismatch: int = -1, gap:
             aligned_seq2_chars.append(seq2[j - 1])
             j -= 1
         else:
-            # Fallback en caso de que la banda no haya cubierto la esquina final perfectamente
             if i > 0 and j > 0:
                 aligned_seq1_chars.append(seq1[i - 1])
                 aligned_seq2_chars.append(seq2[j - 1])
